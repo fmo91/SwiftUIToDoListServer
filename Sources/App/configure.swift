@@ -12,6 +12,7 @@ public func configure(_ app: Application) throws {
     ), as: .mongo)
 
     app.migrations.add(CreateTodo())
+    try app.autoMigrate().wait()
 
     // register routes
     try routes(app)

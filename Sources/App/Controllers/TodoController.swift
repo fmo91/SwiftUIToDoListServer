@@ -2,12 +2,17 @@ import Fluent
 import Vapor
 
 struct TodoController: RouteCollection {
+    enum ToDoError: Error {
+        case notFound
+    }
+    
     func boot(routes: RoutesBuilder) throws {
         let todos = routes.grouped("todos")
         todos.get(use: index)
         todos.post(use: create)
         todos.group(":todoID") { todo in
             todo.delete(use: delete)
+            todo.put(use: update)
         }
     }
 
@@ -24,6 +29,22 @@ struct TodoController: RouteCollection {
         return Todo.find(req.parameters.get("todoID"), on: req.db)
             .unwrap(or: Abort(.notFound))
             .flatMap { $0.delete(on: req.db) }
+            .transform(to: .ok)
+    }
+    
+    func update(req: Request) throws -> EventLoopFuture<HTTPStatus> {
+        let todo = try req.content.decode(Todo.self)
+        
+        return Todo.find(req.parameters.get("todoID"), on: req.db)
+            .unwrap(or: Abort(.notFound))
+            .map { (oldTodo: Todo) -> Todo in
+                oldTodo.title = todo.title
+                oldTodo.completed = todo.completed
+                return oldTodo
+            }
+            .flatMap { (todo: Todo) in
+                todo.update(on: req.db)
+            }
             .transform(to: .ok)
     }
 }
